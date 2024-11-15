@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sci Fi Book Finder</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: linear-gradient(to bottom, #001f3f, #011627);
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 3rem;
+      text-align: center;
+      margin: 20px 0;
+      text-shadow: 0 0 10px #00ffd5;
+      color: #00ffd5;
+    }
+    .content-wrapper {
+      max-width: 1000px;
+      width: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .book-card {
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border: 2px solid #00ffd5;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 15px #00ffd5;
+    }
+    .progress-container {
+      width: 100%;
+      background: #333;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .progress-bar {
+      height: 20px;
+      background: #00ffd5;
+      text-align: center;
+      font-size: 14px;
+      line-height: 20px;
+      color: #001f3f;
+    }
+    button {
+      background: #001f3f;
+      color: #00ffd5;
+      border: 2px solid #00ffd5;
+      border-radius: 5px;
+      font-size: 1rem;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: all 0.3s ease-in-out;
+    }
+    button:hover {
+      background: #00ffd5;
+      color: #001f3f;
+    }
+    canvas {
+      max-width: 100%;
+      margin: 20px auto;
+    }
+    .recommendation p {
+      font-size: 1rem;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Sci Fi Book Finder</h1>
+  <div class="content-wrapper">
+    <div class="progress-container">
+      <div class="progress-bar" id="progress-bar" style="width: 0%;">0%</div>
+    </div>
+    <div id="book-container">
+      <!-- Book details and rating options will be dynamically rendered here -->
+    </div>
+    <div style="text-align: center;">
+      <button id="skip-button">Skip</button>
+      <button id="stop-button">Stop</button>
+    </div>
+    <div id="recommendations" class="recommendation"></div>
+  </div>
+
+  <script>
+    const books = [
+      { "title": "Neuromancer", "author": "William Gibson", "year": 1984, "genre": "Cyberpunk" },
+      { "title": "Dune", "author": "Frank Herbert", "year": 1965, "genre": "Space Opera" },
+      { "title": "Station Eleven", "author": "Emily St. John Mandel", "year": 2014, "genre": "Apocalyptic Fiction" },
+      { "title": "Foundation", "author": "Isaac Asimov", "year": 1951, "genre": "Space Opera" },
+      { "title": "Hyperion", "author": "Dan Simmons", "year": 1989, "genre": "Space Opera" },
+      { "title": "The Road", "author": "Cormac McCarthy", "year": 2006, "genre": "Apocalyptic Fiction" },
+      { "title": "The Left Hand of Darkness", "author": "Ursula K. Le Guin", "year": 1969, "genre": "Feminist Science Fiction" },
+      { "title": "Snow Crash", "author": "Neal Stephenson", "year": 1992, "genre": "Cyberpunk" },
+      { "title": "The Stand", "author": "Stephen King", "year": 1978, "genre": "Apocalyptic Fiction" },
+      { "title": "The Expanse", "author": "James S.A. Corey", "year": 2011, "genre": "Space Opera" }
+    ];
+
+    const recommendationPool = [
+      { "title": "Altered Carbon", "author": "Richard K. Morgan", "year": 2002, "genre": "Cyberpunk" },
+      { "title": "Children of Time", "author": "Adrian Tchaikovsky", "year": 2015, "genre": "Space Opera" },
+      { "title": "The Parable of the Sower", "author": "Octavia E. Butler", "year": 1993, "genre": "Apocalyptic Fiction" },
+      { "title": "Pattern Recognition", "author": "William Gibson", "year": 2003, "genre": "Cyberpunk" },
+      { "title": "Leviathan Wakes", "author": "James S.A. Corey", "year": 2011, "genre": "Space Opera" },
+      { "title": "The Drowned Cities", "author": "Paolo Bacigalupi", "year": 2012, "genre": "Apocalyptic Fiction" }
+    ];
+
+    let currentBookIndex = 0;
+    const ratings = [];
+    const genreStats = {}; // Tracks count and total rating per genre
+    const ratedBooks = new Set();
+
+    const bookContainer = document.getElementById("book-container");
+    const skipButton = document.getElementById("skip-button");
+    const stopButton = document.getElementById("stop-button");
+    const recommendationsContainer = document.getElementById("recommendations");
+
+    // Update the progress bar
+    function updateProgressBar() {
+      const totalRated = ratedBooks.size;
+      const percentage = Math.min((totalRated / books.length) * 100, 100);
+      console.log("Progress Updated: Rated Books", totalRated, "Percentage:", percentage + "%");
+    }
+
+    // Display a book for rating
+    function displayBook() {
+      bookContainer.innerHTML = ""; // Clear previous content
+
+      // Filter books to exclude previously rated ones
+      const availableBooks = books.filter(book => !ratedBooks.has(book.title));
+      if (currentBookIndex >= availableBooks.length) {
+        displayRecommendations();
+        return;
+      }
+
+      const book = availableBooks[currentBookIndex];
+      const bookCard = document.createElement("div");
+      bookCard.className = "book-card";
+      bookCard.innerHTML = `
+        <h3>${book.title}</h3>
+        <p>Author: ${book.author}</p>
+        <p>Year: ${book.year}</p>
+        <p>Genre: ${book.genre}</p>
+      `;
+
+      // Rating options
+      const ratingGroup = document.createElement("div");
+      ratingGroup.className = "rating-group";
+      for (let i = 1; i <= 5; i++) {
+        const label = document.createElement("label");
+        label.innerHTML = `<input type="radio" name="rating" value="${i}"> ${i}`;
+        ratingGroup.appendChild(label);
+      }
+      const haventRead = document.createElement("label");
+      haventRead.innerHTML = `<input type="radio" name="rating" value="haven't read"> Haven't read it`;
+      ratingGroup.appendChild(haventRead);
+
+      const submitButton = document.createElement("button");
+      submitButton.textContent = "Submit Rating";
+      submitButton.addEventListener("click", () => {
+        const selectedRating = document.querySelector("input[name='rating']:checked");
+        if (!selectedRating) {
+          alert("Please select a rating.");
+          return;
+        }
+        const rating = selectedRating.value;
+        ratedBooks.add(book.title);
+        if (rating !== "haven't read") {
+          const genre = book.genre;
+          if (!genreStats[genre]) genreStats[genre] = { count: 0, totalRating: 0 };
+          genreStats[genre].count++;
+          genreStats[genre].totalRating += parseInt(rating);
+        }
+        ratings.push({ title: book.title, genre: book.genre, rating });
+        console.log("Current Ratings:", ratings);
+        console.log("Current Genre Stats:", genreStats);
+        currentBookIndex++;
+        displayBook();
+      });
+
+      bookCard.appendChild(ratingGroup);
+      bookCard.appendChild(submitButton);
+      bookContainer.appendChild(bookCard);
+    }
+
+    // Display recommendations
+    function displayRecommendations() {
+      const sortedGenres = Object.entries(genreStats)
+        .sort(([, a], [, b]) => b.count - a.count)
+        .map(([genre]) => genre);
+
+      console.log("Sorted Genres for Recommendations:", sortedGenres);
+
+      const recommendations = recommendationPool.filter(book =>
+        sortedGenres.includes(book.genre) && !ratedBooks.has(book.title)
+      ).slice(0, 3);
+
+      recommendationsContainer.innerHTML = `<h3>Recommended Books:</h3>` + 
+        (recommendations.length > 0
+          ? recommendations.map(book => `<p><strong>${book.title}</strong> by ${book.author} (${book.year}) [${book.genre}]</p>`).join("")
+          : "<p>No recommendations available.</p>");
+    }
+
+    // Initialize
+    skipButton.addEventListener("click", () => {
+      currentBookIndex++;
+      displayBook();
+    });
+    stopButton.addEventListener("click", displayRecommendations);
+    displayBook();
+    updateProgressBar();
+  </script>
+
+</body>
+</html>
